@@ -1,0 +1,24 @@
+{
+  "name": "raven",
+  "version": "1.0.0",
+  "description": "Minimal sub/pub to aid data flux.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isacvale/dvo-raven.git"
+  },
+  "keywords": [
+    "flux",
+    "subpub",
+    "data-binding"
+  ],
+  "author": "isacvale and ndvo",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/isacvale/dvo-raven/issues"
+  },
+  "homepage": "https://github.com/isacvale/dvo-raven#readme"
+}

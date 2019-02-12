@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    </script>
+    <meta charset="utf-8">
+    <title>Testing raven</title>
+  </head>
+  <body>
+    <script type="module">
+      import raven from './index.js'
+      const g = {}
+      g.store = {foo:0}
+      function logMe(){ console.log("subscription worked") }
+
+      raven.subscribe( g.store, "foo", logMe )
+      g.store.foo = 1
+
+      raven.unsubscribe(  )
+      g.store.foo = 2
+      if(g.store.foo == 2)
+      console.log("unsubscription worked")
+      console.log(Object.getOwnPropertyNames(g.store))
+
+    </script>
+  </body>
+</html>
