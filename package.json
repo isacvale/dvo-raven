@@ -1,6 +1,6 @@
 {
   "name": "raven",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Minimal sub/pub to aid data flux.",
   "main": "index.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "subpub",
     "data-binding"
   ],
-  "author": "isacvale and ndvo",
+  "author": "isacvale",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/isacvale/dvo-raven/issues"

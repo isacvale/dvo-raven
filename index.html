@@ -11,6 +11,8 @@
     <input type="number">
     <h2></h2>
     <input type="search">
+    <input type="email">
+
 
 
     <script type="module">
@@ -22,7 +24,6 @@
 
       import raven from './raven.mjs'
       window.raven = raven
-
 
       /*
         Milestone 1
@@ -41,7 +42,8 @@
           dislikes: [
             "loud noise",
             "veggies"
-          ]
+          ],
+          email: 'nani@example.com'
         },
         family: {
           father: 'daddy',
@@ -133,25 +135,26 @@
       const family = {
         father: 'me'
       }
-      const h2 = document.querySelector('h2')
-      const search = document.querySelector('input[type="search"]')
-
       window.family = family
       raven.pull({family: 'father'},
         {
           target: family,
           prop: 'father'
-        }, value => value+'!')      
+        }, value => value+'!')
+
+      const h2 = document.querySelector('h2')
       raven.pull({family: 'father'},
       {
         target: h2,
         prop: 'textContent'
       }, value => '-'+value+'...')      
+      const search = document.querySelector('input[type="search"]')
       raven.pull({family: 'father'},
       {
         target: search,
         prop: 'value'
       }, value => '-'+value+'...')
+
 
 
       /*
@@ -162,9 +165,13 @@
 
       raven.sync({family: "mother"}, {target: family, prop:"mother"})
 
-
-      console.log("--- Current state ---")
-      console.log(store)
+      const email = document.querySelector('input[type="email"]')
+      raven.sync(
+        {personal: "email"},
+        {target: email, prop:"value"},
+        value => value.replace('@example.com',''),
+        value => [value, '@example.com'].join('')
+        )
 
 
       // window.myStore = {
