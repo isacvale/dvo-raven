@@ -173,36 +173,6 @@
         value => [value, '@example.com'].join('')
         )
 
-
-      // window.myStore = {
-      //   joao: {a:"1"}
-      // }
-
-      // window.foo = "hello"
-
-      // const myRaven = raven(myStore)
-      // myRaven.subscribe(
-      //   {joao:0},
-      //   () => foo = "ahoy!"
-      // )
     </script>
-
-
-    <!-- <script type="module">
-      import raven from './index.js'
-      const g = {}
-      g.store = {foo:0}
-      function logMe(){ console.log("subscription worked") }
-
-      raven.subscribe( g.store, "foo", logMe )
-      g.store.foo = 1
-
-      raven.unsubscribe(  )
-      g.store.foo = 2
-      if(g.store.foo == 2)
-      console.log("unsubscription worked")
-      console.log(Object.getOwnPropertyNames(g.store))
-
-    </script> -->
   </body>
 </html>
