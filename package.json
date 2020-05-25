@@ -1,8 +1,8 @@
 {
   "name": "@dvo/raven",
-  "version": "2.0.0",
-  "description": "Minimal sub/pub to aid data flux.",
-  "main": "index.js",
+  "version": "2.0.1",
+  "description": "A simple store and databinding tool for vanilla applications.",
+  "main": "build/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -13,7 +13,8 @@
   "keywords": [
     "flux",
     "subpub",
-    "data-binding"
+    "data-binding",
+    "javascript"
   ],
   "author": "isacvale",
   "license": "ISC",
