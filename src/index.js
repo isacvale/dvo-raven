@@ -4,8 +4,8 @@ const raven = {
   Allows the registration of the store, so it doesn't have to be resupplied constantly.
   */
   store: {},
-  load( userStore ){
-  this.store = userStore
+  load (userStore) {
+    this.store = userStore
   },
 
   /*
@@ -17,16 +17,16 @@ const raven = {
   /*
   A prefix for getter/setters.
   */
-  prefix: "_",
+  prefix: '_',
 
   /*
   These functions will detect the type of a prop so it can be dealt with properly.
   */
-  isArray (prop){
-    return Array.isArray( prop )
+  isArray (prop) {
+    return Array.isArray(prop)
   },
-  isObject (prop){
-    return typeof prop == "object" && !this.isArray( prop ) && prop != null
+  isObject (prop) {
+    return typeof prop === 'object' && !this.isArray(prop) && prop != null
   },
 
   /*
@@ -36,10 +36,9 @@ const raven = {
     passing an argument ['a','b'] would
     return the object { target: {b: 'c'}, prop: 'b' }.
   */
-  reach (arr, obj=this.store) {
-    if(arr.length == 1)
-    return {target:obj, prop: arr[0]}
-  
+  reach (arr, obj = this.store) {
+    if (arr.length === 1) { return { target: obj, prop: arr[0] } }
+
     const newArray = [...arr]
     const popped = newArray.shift()
     const nextObj = obj[popped]
@@ -52,20 +51,14 @@ const raven = {
     Passing an object {a: {b: 1, c: 2}}
     would return [[a,b], [a,c]]
   */
-  treeToList ( obj ) {
-    let i=0
+  treeToList (obj) {
     const original = []
 
-    const treeToListLoop = (obj, acc=[]) => {
-      if (this.isObject(obj))
-        Object.keys(obj).forEach( child =>
-          treeToListLoop( obj[child], [...acc, child]))
-      else if (this.isArray(obj))
-          obj.forEach(child => treeToListLoop( obj[child], [...acc, child]))
-      else if (typeof obj == "string")
-        original.push([...acc, obj])
-      else
-        original.push([...acc])
+    const treeToListLoop = (obj, acc = []) => {
+      if (this.isObject(obj)) {
+        Object.keys(obj).forEach(child =>
+          treeToListLoop(obj[child], [...acc, child]))
+      } else if (this.isArray(obj)) { obj.forEach(child => treeToListLoop(obj[child], [...acc, child])) } else if (typeof obj === 'string') { original.push([...acc, obj]) } else { original.push([...acc]) }
     }
 
     treeToListLoop(obj)
@@ -85,20 +78,20 @@ const raven = {
     const listToTreeLoop = (path, curr, original) => {
       path = [...path]
       const newKey = path.shift()
-      if (path.length>1) {
+      if (path.length > 1) {
         if (!curr[newKey]) {
-          curr[newKey] = {}                
+          curr[newKey] = {}
         }
-      return listToTreeLoop(path, curr[newKey], original)
+        return listToTreeLoop(path, curr[newKey], original)
       } else {
         curr[newKey] = path.shift()
         return original
       }
     }
-    list.forEach( path => {
+    list.forEach(path => {
       listToTreeLoop(path, tree, tree)
     })
-    
+
     return tree
   },
 
@@ -111,7 +104,7 @@ const raven = {
   */
   addValueToTree (obj, value) {
     const listFromTree = this.treeToList(obj)
-    const mappedList = listFromTree.map( path => [...path, value])
+    const mappedList = listFromTree.map(path => [...path, value])
     const tree = this.listToTree([...mappedList])
     return tree
   },
@@ -119,12 +112,12 @@ const raven = {
   /*
   Subscribe allows a callback to be called whenever the prop changes on the given store.
   */
-  subscribe ( tree, callback, thisStore=this.store ) {
+  subscribe (tree, callback, thisStore = this.store) {
     const observedProps = this.treeToList(tree)
-    observedProps.forEach( list => {
+    observedProps.forEach(list => {
       const key = list.join('|')
       // const key = JSON.stringify(list)
-      if(!this.sub[key]){
+      if (!this.sub[key]) {
         this.sub[key] = []
       }
       this.sub[key].push(callback)
@@ -136,15 +129,13 @@ const raven = {
   */
   expandList (array) {
     const expandedArray = []
-    array.forEach( (item, idx) => {
-      if( idx == 0 )
-      expandedArray.push( [item] )
-      else {
-        const newItem = [...expandedArray[idx-1]]
+    array.forEach((item, idx) => {
+      if (idx === 0) { expandedArray.push([item]) } else {
+        const newItem = [...expandedArray[idx - 1]]
         newItem.push(item)
         expandedArray.push(newItem)
       }
-    })  
+    })
     return expandedArray
   },
 
@@ -153,31 +144,27 @@ const raven = {
   */
   set (arg, store = this.store) {
     const listOfPaths = []
-    const setLoop = (obj, ref, path =[]) => Object.keys(obj).forEach( key => {
+    const setLoop = (obj, ref, path = []) => Object.keys(obj).forEach(key => {
     // Check if it exists on store, otherwise create it
-    if(!ref[key]) ref[key] = undefined
-    // If it references an object, loop through its keys
-    if(this.isObject(obj[key])) {
-      path.push(key)
-      setLoop(obj[key], store[key], path)
-    }
-    // If it is an array, substitute it
-    else if(this.isArray(obj[key])) {
-    if (ref[key] != [...obj[key]]) {
-      listOfPaths.push([...path, key])
-      ref[key] = [...obj[key]]
-    } else console.log('was equal?')
-    }
-    // If it is scalar, substitute it
-    else if (ref[key] != obj[key]) {
-      listOfPaths.push([...path, key])
-      ref[key] = obj[key]
-    }
-    else console.log('was equal?')
-  })
-    setLoop( arg, store)
-    console.log('..listOfPaths', listOfPaths)
-    this.doCallbacks( listOfPaths, store )
+      if (!ref[key]) ref[key] = undefined
+      // If it references an object, loop through its keys
+      if (this.isObject(obj[key])) {
+        path.push(key)
+        setLoop(obj[key], store[key], path)
+      // If it is an array, substitute it
+      } else if (this.isArray(obj[key])) {
+        if (ref[key] !== [...obj[key]]) {
+          listOfPaths.push([...path, key])
+          ref[key] = [...obj[key]]
+        }
+      // If it is scalar, substitute it
+      } else if (ref[key] !== obj[key]) {
+        listOfPaths.push([...path, key])
+        ref[key] = obj[key]
+      }
+    })
+    setLoop(arg, store)
+    this.doCallbacks(listOfPaths, store)
   },
 
   /*
@@ -186,32 +173,31 @@ const raven = {
     If ['country', 'state', 'town'] is passed as argument, all callbacks registered
     under "country", "country|state" and "country|state|town" get called.
   */
-  doCallbacks( listOfArgs, store=this.store) {
-    const expandedListRepeated = listOfArgs.map( list => this.expandList(list))
+  doCallbacks (listOfArgs, store = this.store) {
+    const expandedListRepeated = listOfArgs.map(list => this.expandList(list))
     const expandedList = [...new Set(expandedListRepeated)]
-    expandedList.forEach( fullList => fullList.forEach( list => {
+    expandedList.forEach(fullList => fullList.forEach(list => {
       const key = list.join('|')
       // const key = JSON.stringify(list)
-      if( this.sub[key] ){
+      if (this.sub[key]) {
         const reached = this.reach(list)
-      this.sub[key].forEach( func => func && func(reached.target[reached.prop]))
-    }
+        this.sub[key].forEach(func => func && func(reached.target[reached.prop]))
+      }
     }))
   },
 
   /*
   Hooks up so that any change to a variable "from" is send through "callback"
   and set to state field "to". It is mainly meant from collecting input from user
-  and automatically setting it to state. 
+  and automatically setting it to state.
   */
-  push(from, to, callback = x => x){
-    if( from.target instanceof HTMLElement ) {
+  push (from, to, callback = x => x) {
+    if (from.target instanceof window.HTMLElement) {
       let events = from.event || ['change', 'input']
-      if( typeof from.event == 'string')
-        events = [from.event]
-      events.forEach( event => 
+      if (typeof from.event === 'string') { events = [from.event] }
+      events.forEach(event =>
         from.target.addEventListener(event, e => {
-          const callbackArg = e.target['value'] || e.target.innerHTML
+          const callbackArg = e.target.value || e.target.innerHTML
           const callbackResult = callback(callbackArg)
           this.set(this.addValueToTree(to, callbackResult))
         })
@@ -222,11 +208,11 @@ const raven = {
         from.prop,
         {
           set: value => {
-          const listOfPaths = this.treeToList(to).map( list => [...list, callback(value)])
-          const newTree = this.listToTree(listOfPaths)
-          raven.set(newTree)
-        
-          from.target[`${this.prefix}${from.prop}`]=value
+            const listOfPaths = this.treeToList(to).map(list => [...list, callback(value)])
+            const newTree = this.listToTree(listOfPaths)
+            raven.set(newTree)
+
+            from.target[`${this.prefix}${from.prop}`] = value
           },
           get: () => from.target[`${this.prefix}${from.prop}`]
         }
@@ -238,8 +224,8 @@ const raven = {
   Hooks up so that any change to state field "from" goes through "callback"
   and is reflected to variable "to". It is mainly meant for data binding.
   */
-  pull(from, to, callback = x => x){
-    this.subscribe(from, value => to.target[to.prop] = callback(value))
+  pull (from, to, callback = x => x) {
+    this.subscribe(from, value => { to.target[to.prop] = callback(value) })
   },
 
   /*
@@ -247,10 +233,10 @@ const raven = {
   (let's say, an input) to be pushed up to store, and any changes to store
   to be passed down.
   */
-  sync(stateTree, obj, callbackToTree, callbackToObject){
+  sync (stateTree, obj, callbackToTree, callbackToObject) {
     this.pull(stateTree, obj, callbackToObject)
     this.push(obj, stateTree, callbackToTree)
   }
-} 
+}
 
 export default raven

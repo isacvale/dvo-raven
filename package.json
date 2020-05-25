@@ -4,7 +4,8 @@
   "description": "A simple store and databinding tool for vanilla applications.",
   "main": "build/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "standard && echo \"Error: no test specified\" && exit 1",
+    "lint": "standard \"src/**/*.js\"",
     "build": "babel ./src -d ./lib"
   },
   "repository": {
@@ -25,6 +26,7 @@
   "homepage": "https://github.com/isacvale/dvo-raven#readme",
   "devDependencies": {
     "babel-cli": "^6.26.0",
-    "babel-preset-env": "^1.7.0"
+    "babel-preset-env": "^1.7.0",
+    "standard": "^14.3.4"
   }
 }
