@@ -4,9 +4,12 @@
   "description": "A simple store and databinding tool for vanilla applications.",
   "main": "build/index.js",
   "scripts": {
-    "test": "standard \"src/**/*[!.test].js\" && jest --coverage",
     "lint": "standard \"src/**/*[!.test].js\"",
-    "build": "babel ./src -d ./lib"
+    "jest": "jest --coverage",
+    "test": "npm run lint && npm run jest",
+    "transpile": "babel ./src -d ./lib",
+    "uglify": "uglifyjs lib/index.js --compress --mangle --output lib/index.js",
+    "build": "npm run transpile && npm run uglify"
   },
   "repository": {
     "type": "git",
@@ -29,6 +32,7 @@
     "@babel/core": "^7.8.7",
     "@babel/preset-env": "^7.8.7",
     "jest": "^26.0.1",
-    "standard": "^14.3.4"
+    "standard": "^14.3.4",
+    "uglify-js": "^3.9.3"
   }
 }
