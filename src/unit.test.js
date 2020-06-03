@@ -64,6 +64,42 @@ describe('Unit testing functions.', () => {
       })
   })
 
+  test('Can reach inside object with a string path.', () => {
+    const store = {
+      a: 1,
+      b: [1, 2],
+      c: {
+        d: 2
+      }
+    }
+    raven.load(store)
+
+    expect(raven.funcs.reach(store)('a'))
+      .toEqual({ 
+        parentObject: store,
+        propertyName: 'a',
+        propertyValue: 1
+      })
+    expect(raven.funcs.reach(store)('b'))
+      .toEqual({ 
+        parentObject: store,
+        propertyName: 'b',
+        propertyValue: [1, 2]
+      })
+    expect(raven.funcs.reach(store)('c'))
+      .toEqual({ 
+        parentObject: store,
+        propertyName: 'c',
+        propertyValue: { d: 2 }
+      })
+    expect(raven.funcs.reach(store)('c.d'))
+      .toEqual({ 
+        parentObject: store.c,
+        propertyName: 'd',
+        propertyValue: 2
+      })
+  })
+
   test('Can convert pathString into objects.', () => {
     expect(raven.funcs.fromStringToObject('a.b.c', 1))
       .toEqual({ a: { b: { c: 1 } } })
@@ -333,4 +369,22 @@ describe('Unit testing functions.', () => {
     expect(raven.store).toEqual({ a: { b: 10000 } })
   })
 
+  test('Can pull a value from store into a DOM element.', () => {
+    const store = { a: { b: 'beforeChange' } }    
+    document.body.innerHTML = `<div id="dom-element"></div>`
+    const div = document.querySelector('#dom-element')
+    raven.clear()
+    raven.load(store)
+    raven.funcs.pullToElement(
+      'a.b',
+      {
+        target: div,
+        prop: 'textContent'
+      },
+      x => x
+    )
+    expect(div.textContent).toBe('beforeChange')
+    raven.set('a.b', 'afterChange')
+    expect(div.textContent).toBe('afterChange')
+  })
 })

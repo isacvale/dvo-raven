@@ -17,6 +17,8 @@ const isObject = target =>
 
 const isString = target => typeof target === 'string'
 
+const identity = x => x
+
 /*
   Data type transformation
 */
@@ -63,6 +65,11 @@ const fromObjectToArrayList = structure => {
 
 const fromObjectToStringList = structure =>
   fromObjectToArrayList(structure).map(fromArrayToString)
+
+const parseToObject = (dataStructure, value) =>
+  typeof dataStructure === 'string'
+    ? fromStringToObject(dataStructure, value)
+    : dataStructure
 
 /*
   Inner functions
@@ -159,7 +166,7 @@ const copyValueToStore = (from, to, callback) => {
   set(stateAdd)
 }
 
-const pushFromElement = (from, to, callback = x => x) => {
+const pushFromElement = (from, to, callback = identity) => {
   const events = typeof from.event === 'string'
     ? [from.event]
     : from.event || ['change', 'input']
@@ -172,7 +179,7 @@ const pushFromElement = (from, to, callback = x => x) => {
   )
 }
 
-const pushFromObject = (from, to, callback = x => x) => {  
+const pushFromObject = (from, to, callback = identity) => {  
   from.target[`${prefix}${from.prop}`] = from.target[from.prop]
   copyValueToStore(from, to, callback)
   Object.defineProperty(
@@ -190,6 +197,12 @@ const pushFromObject = (from, to, callback = x => x) => {
       get: () => from.target[`${prefix}${from.prop}`]
     }
   )
+}
+
+const pullToElement = (from, to, callback = identity) => {
+  const currentValue = reach(raven.store)(from).propertyValue
+  to.target[to.prop] = callback(currentValue)
+  subscribe(from, value => { to.target[to.prop] = callback(value) })
 }
 
 /*
@@ -223,14 +236,17 @@ const clear = () => {
   raven.funcs.subscriptions = {}
 }
 
-const push = (from, to, callback = x => x, funcEl = pushFromElement, funcObj = pushFromObject) => {
-  const parsedTo = typeof to === 'string'
-    ? fromStringToObject(to, true)
-    : to
+const push = (from, to, callback = identity, funcEl = pushFromElement, funcObj = pushFromObject) => {
+  const parsedTo = parseToObject(to, true)
   const func = from.target instanceof window.HTMLElement
     ? funcEl
     : funcObj
   func(from, parsedTo, callback)
+}
+
+const pull = (from, to, callback = identity, funcEl = pullToElement) => {
+  const parsedFrom = parseToObject(from, true)
+  funcEl(parsedFrom, to, callback)
 }
 
 const raven = {
@@ -256,6 +272,7 @@ const raven = {
     isObject,
     isString,
     mergeObjects,
+    pullToElement,
     pushFromObject,
     pushFromElement,
     reach,
