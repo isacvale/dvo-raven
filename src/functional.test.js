@@ -198,4 +198,32 @@ describe('Testing functionalities.', () => {
     raven.set('a.b', [{...state.a.b[0], d: 4 } ])
     expect(argument).toEqual({ b: [{ c: 3, d: 4 }] })
   })
+
+  test('Can push data change from object to store.', () => {
+    const state = { a: { b: 'original' } }
+    const externalObject = { prop: 'toBeOverWritten' }
+    raven.clear()
+    raven.load(state)
+    raven.push({
+      target: externalObject,
+      prop: 'prop'
+    }, { a : { b: 1 } })
+    expect(raven.store.a.b).toBe('toBeOverWritten')
+    externalObject.prop = 'overWrittenValue'
+    expect(raven.store).toEqual({ a: { b: 'overWrittenValue' } })
+  })
+
+  test('Can push data change from object to store with a string path.', () => {
+    const state = { a: { b: 'original' } }
+    const externalObject = { prop: 'toBeOverWritten' }
+    raven.clear()
+    raven.load(state)
+    raven.push({
+      target: externalObject,
+      prop: 'prop'
+    }, 'a.b')
+    expect(raven.store.a.b).toBe('toBeOverWritten')
+    externalObject.prop = 'overWrittenValue'
+    expect(raven.store).toEqual({ a: { b: 'overWrittenValue' } })
+  })
 })

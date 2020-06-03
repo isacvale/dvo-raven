@@ -154,6 +154,11 @@ const setValueToObject = targetObject => value => {
   return fromArrayListToObject(pathList)
 }
 
+const copyValueToStore = (from, to, callback) => {
+  const stateAdd = setValueToObject(to)(callback(from.target[from.prop]))
+  set(stateAdd)
+}
+
 const pushFromElement = (from, to, callback = x => x) => {
   const events = typeof from.event === 'string'
     ? [from.event]
@@ -168,6 +173,8 @@ const pushFromElement = (from, to, callback = x => x) => {
 }
 
 const pushFromObject = (from, to, callback = x => x) => {  
+  from.target[`${prefix}${from.prop}`] = from.target[from.prop]
+  copyValueToStore(from, to, callback)
   Object.defineProperty(
     from.target,
     from.prop,
@@ -180,7 +187,7 @@ const pushFromObject = (from, to, callback = x => x) => {
           )
         from.target[`${prefix}${from.prop}`] = value
       },
-      get: () => 'llalalala' //from.target[`${prefix}${from.prop}`]
+      get: () => from.target[`${prefix}${from.prop}`]
     }
   )
 }
@@ -217,15 +224,19 @@ const clear = () => {
 }
 
 const push = (from, to, callback = x => x, funcEl = pushFromElement, funcObj = pushFromObject) => {
+  const parsedTo = typeof to === 'string'
+    ? fromStringToObject(to, true)
+    : to
   const func = from.target instanceof window.HTMLElement
     ? funcEl
     : funcObj
-  func(from, to, callback)
+  func(from, parsedTo, callback)
 }
 
 const raven = {
   clear,
   load,
+  push,
   set,
   store: {},
   subscribe,
@@ -233,6 +244,7 @@ const raven = {
     addPartialPaths,
     addPartialArrayPaths,
     addPartialStringPaths,
+    copyValueToStore,
     fromArrayListToObject,
     fromArrayToString,
     fromStringToObject,
@@ -244,7 +256,6 @@ const raven = {
     isObject,
     isString,
     mergeObjects,
-    push,
     pushFromObject,
     pushFromElement,
     reach,

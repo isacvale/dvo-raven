@@ -215,7 +215,7 @@ describe('Unit testing functions.', () => {
     const callback = (...args) => {
       result = [...args]
     }
-    raven.funcs.push({}, {}, dud, dud, callback)
+    raven.push({}, {}, dud, dud, callback)
     expect(result).toEqual([{}, {}, dud])
   })
 
@@ -227,7 +227,7 @@ describe('Unit testing functions.', () => {
     const callback = (...args) => {
       result = [...args]
     }
-    raven.funcs.push(obj, {}, dud, dud, callback)
+    raven.push(obj, {}, dud, dud, callback)
     expect(result).toEqual([obj, {}, dud])
   })
 
@@ -240,24 +240,24 @@ describe('Unit testing functions.', () => {
       target: fromObject,
       prop: 'a'
     }, { target: 1 })
-    expect(fromObject.a).toBe(undefined)
+    expect(fromObject.a).toBe(1)
     fromObject.a = 10
     expect(fromObject.a).toBe(10)
-    expect(raven.store.target).toEqual(10)
+    expect(raven.store.target).toBe(10)
   })
 
 
-  // test('Can read property pushed from an object.', () => {
-  //   raven.clear()
-  //   raven.load({ target: {} })
-  //   const fromObject = { a: 1 }
-  //   raven.funcs.pushFromObject({
-  //     target: fromObject,
-  //     prop: 'a'
-  //   }, { target: 1 })
-  //   fromObject.a = 10
-  //   expect(raven.store.target).toEqual(10)
-  // })
+  test('Can read property pushed from an object.', () => {
+    raven.clear()
+    raven.load({ target: {} })
+    const fromObject = { a: 1 }
+    raven.funcs.pushFromObject({
+      target: fromObject,
+      prop: 'a'
+    }, { target: 1 })
+    fromObject.a = 10
+    expect(raven.store.target).toEqual(10)
+  })
 
   test('Data push from a DOM element correctly updates on a target.', () => {
     document.body.innerHTML =
@@ -303,6 +303,34 @@ describe('Unit testing functions.', () => {
       },
       e: 3
     })
+  })
+
+  test('Can immediately copy a value to store.', () => {
+    const store = { a: { b: 'original' } }
+    const externalObject = { a: { b: 'changed' } }
+    raven.clear()
+    raven.load(store)
+    raven.funcs.copyValueToStore({
+      target: externalObject.a,
+      prop: 'b'
+    },
+    { a: { b: 1 } },
+    x => x)
+    expect(raven.store).toEqual({ a: { b: 'changed' } })
+  })
+
+  test('Can immediately copy a value to store through an intermidiate function.', () => {
+    const store = { a: { b: 1 } }
+    const externalObject = { a: { b: 100 } }
+    raven.clear()
+    raven.load(store)
+    raven.funcs.copyValueToStore({
+      target: externalObject.a,
+      prop: 'b'
+    },
+    { a: { b: 1 } },
+    x => x * x)
+    expect(raven.store).toEqual({ a: { b: 10000 } })
   })
 
 })
