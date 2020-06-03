@@ -58,7 +58,13 @@ const raven = {
       if (this.isObject(obj)) {
         Object.keys(obj).forEach(child =>
           treeToListLoop(obj[child], [...acc, child]))
-      } else if (this.isArray(obj)) { obj.forEach(child => treeToListLoop(obj[child], [...acc, child])) } else if (typeof obj === 'string') { original.push([...acc, obj]) } else { original.push([...acc]) }
+      } else if (this.isArray(obj)) {
+        obj.forEach(child => treeToListLoop(obj[child], [...acc, child]))
+      } else if (typeof obj === 'string') {
+        original.push([...acc, obj])
+      } else {
+        original.push([...acc])
+      }
     }
 
     treeToListLoop(obj)
@@ -144,25 +150,31 @@ const raven = {
   */
   set (arg, store = this.store) {
     const listOfPaths = []
-    const setLoop = (obj, ref, path = []) => Object.keys(obj).forEach(key => {
-    // Check if it exists on store, otherwise create it
-      if (!ref[key]) ref[key] = undefined
-      // If it references an object, loop through its keys
-      if (this.isObject(obj[key])) {
-        path.push(key)
-        setLoop(obj[key], store[key], path)
-      // If it is an array, substitute it
-      } else if (this.isArray(obj[key])) {
-        if (ref[key] !== [...obj[key]]) {
-          listOfPaths.push([...path, key])
-          ref[key] = [...obj[key]]
+    const setLoop = (obj, ref, path = []) =>
+      Object.keys(obj).forEach(key => {
+        // Check if it exists on store, otherwise create it
+        // if (!ref[key]) ref[key] = undefined
+
+        // If it references an object, loop through its keys
+        if (this.isObject(obj[key])) {
+          path.push(key)
+          setLoop(obj[key], obj, path)
+          return
         }
-      // If it is scalar, substitute it
-      } else if (ref[key] !== obj[key]) {
-        listOfPaths.push([...path, key])
-        ref[key] = obj[key]
-      }
-    })
+        // If it is an array, substitute it
+        if (this.isArray(obj[key])) {
+          if (ref[key] !== [...obj[key]]) {
+            listOfPaths.push([...path, key])
+            ref[key] = [...obj[key]]
+          }
+          return
+        }
+        // If it is scalar, substitute it
+        if (ref[key] !== obj[key]) {
+          listOfPaths.push([...path, key])
+          ref[key] = obj[key]
+        }
+      })
     setLoop(arg, store)
     this.doCallbacks(listOfPaths, store)
   },

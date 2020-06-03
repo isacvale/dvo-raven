@@ -8,15 +8,14 @@
     "jest": "jest --coverage",
     "test": "npm run lint && npm run jest",
     "transpile": "babel ./src -d ./lib",
-    "uglify": "uglifyjs lib/index.js --compress --mangle --output lib/index.js",
-    "build": "npm run transpile && npm run uglify"
+    "minify": "terser lib/index.js --compress --mangle --output lib/index.js",
+    "build": "npm run transpile && npm run minify"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isacvale/dvo-raven.git"
   },
   "keywords": [
-    "flux",
     "subpub",
     "data-binding",
     "javascript"
@@ -33,6 +32,6 @@
     "@babel/preset-env": "^7.8.7",
     "jest": "^26.0.1",
     "standard": "^14.3.4",
-    "uglify-js": "^3.9.3"
+    "terser": "^4.7.0"
   }
 }
