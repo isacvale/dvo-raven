@@ -222,9 +222,11 @@ const set = (request, value) => {
 }
 
 const subscribe = (target, callback) => {
-  const callbackKeys = typeof target === 'string'
-    ? [target]
-    : fromObjectToStringList(target)
+  const callbackKeys = isObject(target)
+    ? fromObjectToStringList(target)
+    : isArray(target)
+      ? [fromArrayToString(target)]
+      : [target]
   callbackKeys.forEach(key =>
     raven.funcs.subscriptions[key] = [
       ...(raven.funcs.subscriptions[key] || []),
@@ -236,6 +238,7 @@ const clear = () => {
   raven.funcs.subscriptions = {}
 }
 
+// Push changes from an object/DOM element to a target object
 const push = (from, to, callback = identity, funcEl = pushFromElement, funcObj = pushFromObject) => {
   const parsedTo = parseToObject(to, true)
   const func = from.target instanceof window.HTMLElement
@@ -244,18 +247,35 @@ const push = (from, to, callback = identity, funcEl = pushFromElement, funcObj =
   func(from, parsedTo, callback)
 }
 
+// Pull changes from an object to a target object/Dom element
 const pull = (from, to, callback = identity, funcEl = pullToElement) => {
-  const parsedFrom = parseToObject(from, true)
+  let parsedFrom = from
+  if (isObject(from)) {
+    const allPaths = fromObjectToArrayList(from)
+    if (allPaths.length > 1) {
+      throw new Error('Raven.pull cannot be passed an object with multiple properties.')
+    } else {
+      parsedFrom = allPaths[0]
+    }
+  }
   funcEl(parsedFrom, to, callback)
+}
+
+// Push and pull shortcut that assumes a link between a DOM element and the store
+const sync = (path, element, callbackToPath = identity, callbackToElement = identity) => {
+  pull(path, element, callbackToElement)
+  push(element, path, callbackToPath)
 }
 
 const raven = {
   clear,
   load,
+  pull,
   push,
   set,
   store: {},
   subscribe,
+  sync,
   funcs: {
     addPartialPaths,
     addPartialArrayPaths,

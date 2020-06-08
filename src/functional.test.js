@@ -1,5 +1,11 @@
 import raven from './raven.js'
 
+const evChange = (el, value) => {
+  el.value = value
+  const ev = new Event('change')
+  el.dispatchEvent(ev)
+}
+
 describe('Testing functionalities.', () => {
   test('Store can be loaded.', () => {
     const store = { a: 1 }
@@ -225,5 +231,104 @@ describe('Testing functionalities.', () => {
     expect(raven.store.a.b).toBe('toBeOverWritten')
     externalObject.prop = 'overWrittenValue'
     expect(raven.store).toEqual({ a: { b: 'overWrittenValue' } })
+  })
+
+  test('Can pull data from store.', () => {
+    const store = { a: { b: 'beforeChange' } }    
+    document.body.innerHTML = `<div id="dom-element"></div>`
+    const div = document.querySelector('#dom-element')
+    raven.clear()
+    raven.load(store)
+    raven.pull('a.b', {
+      target: div,
+      prop: 'textContent'
+    })
+    expect(div.textContent).toBe('beforeChange')
+    raven.set({
+      a: { b: 'afterChange' }
+    })
+    expect(div.textContent).toBe('afterChange')
+  })
+
+  test('Can pull data from store using simple object.', () => {
+    const store = { a: { b: 'beforeChange' } }    
+    document.body.innerHTML = `<div id="dom-element"></div>`
+    const div = document.querySelector('#dom-element')
+    raven.clear()
+    raven.load(store)
+    raven.pull({ a: { b: true } }, {
+      target: div,
+      prop: 'textContent'
+    })
+    expect(div.textContent).toBe('beforeChange')
+    raven.set({
+      a: { b: 'afterChange' }
+    })
+    expect(div.textContent).toBe('afterChange')
+  })
+
+  test('Expect an error is pulled ambiguous object.', () => {
+    const store = { a: 1, b: 2 }
+    document.body.innerHTML = `<div id="dom-element"></div>`
+    const div = document.querySelector('#dom-element')
+    raven.clear()
+    raven.load(store)
+    expect(() =>
+      raven.pull(
+        { a: 3, b: 4 },
+        {
+          target: div,
+          prop: 'textContent'
+        },
+        x => x
+      )
+    ).toThrow()
+  })
+
+  test("Sync'd element can push changes to the store.", () => {
+    document.body.innerHTML = `<input id="dom-input"></div>`
+    const element = document.querySelector('#dom-input')
+    raven.clear()
+    raven.load({
+      value: 'beforeChange'
+    })
+    raven.sync('value', {
+      target: element,
+      prop: 'value'
+    })
+    evChange(element, 'afterChange')
+    expect(raven.store.value).toBe('afterChange')
+  })
+
+  test("Sync'd element can pull changes from the store.", () => {
+    document.body.innerHTML = `<input id="dom-input">`
+    const element = document.querySelector('#dom-input')
+    raven.clear()
+    raven.load({
+      value: 'beforeChange'
+    })
+    raven.sync('value', {
+      target: element,
+      prop: 'value'
+    })
+    raven.set({ 'value': 'afterChange' })
+    expect(element.value).toBe('afterChange')
+  })
+
+  test("Sync'd element stays in sync after data goes both ways.", () => {
+    document.body.innerHTML = `<input id="dom-input">`
+    const element = document.querySelector('#dom-input')
+    raven.clear()
+    raven.load({
+      value: 'beforeChange'
+    })
+    raven.sync('value', {
+      target: element,
+      prop: 'value'
+    })
+    raven.set({ 'value': 'afterChange' })
+    expect(element.value).toBe('afterChange')
+    evChange(element, 'afterSecondChange')
+    expect(raven.store.value).toBe('afterSecondChange')
   })
 })

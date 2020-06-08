@@ -1,5 +1,11 @@
 import raven from './raven.js'
 
+const evChange = (el, value) => {
+  el.value = value
+  const ev = new Event('change')
+  el.dispatchEvent(ev)
+}
+
 describe('Unit testing functions.', () => {
 
   test('Can detect arrays', () => {
@@ -306,9 +312,10 @@ describe('Unit testing functions.', () => {
       target: input
     }, { target: 1 })
   
-    input.value = 'changedValue'
-    const event = new Event('change')
-    input.dispatchEvent(event)
+    evChange(input, 'changedValue')
+    // input.value = 'changedValue'
+    // const event = new Event('change')
+    // input.dispatchEvent(event)
 
     expect(raven.store.target).toBe('changedValue')
   })
@@ -369,7 +376,7 @@ describe('Unit testing functions.', () => {
     expect(raven.store).toEqual({ a: { b: 10000 } })
   })
 
-  test('Can pull a value from store into a DOM element.', () => {
+  test('Can pull a value from store into a DOM element with a string.', () => {
     const store = { a: { b: 'beforeChange' } }    
     document.body.innerHTML = `<div id="dom-element"></div>`
     const div = document.querySelector('#dom-element')
@@ -377,6 +384,25 @@ describe('Unit testing functions.', () => {
     raven.load(store)
     raven.funcs.pullToElement(
       'a.b',
+      {
+        target: div,
+        prop: 'textContent'
+      },
+      x => x
+    )
+    expect(div.textContent).toBe('beforeChange')
+    raven.set('a.b', 'afterChange')
+    expect(div.textContent).toBe('afterChange')
+  })
+
+  test('Can pull a value from store into a DOM element with an array.', () => {
+    const store = { a: { b: 'beforeChange' } }    
+    document.body.innerHTML = `<div id="dom-element"></div>`
+    const div = document.querySelector('#dom-element')
+    raven.clear()
+    raven.load(store)
+    raven.funcs.pullToElement(
+      ['a', 'b'],
       {
         target: div,
         prop: 'textContent'
