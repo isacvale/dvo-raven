@@ -1,253 +1,326 @@
-const raven = {
+// When raven needs to use getter and setters on outside objects, it will make use of this prefix.
+const prefix = '_'
 
-  /*
-  Allows the registration of the store, so it doesn't have to be resupplied constantly.
-  */
-  store: {},
-  load (userStore) {
-    this.store = userStore
-  },
+/*
+  Utilidades
+*/
 
-  /*
-  An object will hold as keys a reference to objects, arrays or scalars. They keys are a stringified version of the object.
-  As values to those keys it holds a list of callback functions to call when it detects changes.
-  */
-  sub: {},
+const pipe = (...operations) => data =>
+  operations.reduce((acc, cur) => cur(acc), data)
 
-  /*
-  A prefix for getter/setters.
-  */
-  prefix: '_',
+const isArray = Array.isArray
 
-  /*
-  These functions will detect the type of a prop so it can be dealt with properly.
-  */
-  isArray (prop) {
-    return Array.isArray(prop)
-  },
-  isObject (prop) {
-    return typeof prop === 'object' && !this.isArray(prop) && prop != null
-  },
+const isObject = target =>
+  typeof target === 'object' &&
+  !isArray(target) &&
+  target !== null
 
-  /*
-  Gets an array of strings and uses them to reach inside an object to return a nested property.
-    Example:
-    Assume a state = {a: {b: 'c'}},
-    passing an argument ['a','b'] would
-    return the object { target: {b: 'c'}, prop: 'b' }.
-  */
-  reach (arr, obj = this.store) {
-    if (arr.length === 1) { return { target: obj, prop: arr[0] } }
+const isString = target => typeof target === 'string'
 
-    const newArray = [...arr]
-    const popped = newArray.shift()
-    const nextObj = obj[popped]
-    return this.reach(newArray, nextObj)
-  },
+const identity = x => x
 
-  /*
-  Takes an object and returns an array of arrays, each containing the strings to make up the branches of the object.
-    Example:
-    Passing an object {a: {b: 1, c: 2}}
-    would return [[a,b], [a,c]]
-  */
-  treeToList (obj) {
-    const original = []
+/*
+  Data type transformation
+*/
 
-    const treeToListLoop = (obj, acc = []) => {
-      if (this.isObject(obj)) {
-        Object.keys(obj).forEach(child =>
-          treeToListLoop(obj[child], [...acc, child]))
-      } else if (this.isArray(obj)) {
-        obj.forEach(child => treeToListLoop(obj[child], [...acc, child]))
-      } else if (typeof obj === 'string') {
-        original.push([...acc, obj])
+const fromStringToArray = path => path.split('.')
+const fromStringListToArrayList = paths => paths.map(fromStringToArray)
+
+const fromArrayToString = path => path.join('.')
+const fromArrayListToStringList = paths => paths.map(fromArrayToString)
+
+const fromArrayToObject = (path, value) =>
+  path.reverse().reduce((acc, cur, idx) =>
+    idx === 0
+      ? { [cur]: value }
+      : { [cur]: acc }
+  , 0)
+const fromArrayListToObject = arrayList =>
+  arrayList
+    .map(fullPath => {
+      const shortPath = [...fullPath]
+      const value = shortPath.pop()
+      return fromArrayToObject(shortPath, value)
+    })
+    .reduce((acc, cur) => mergeObjects(acc, cur))
+
+const fromStringToObject = (path, value) =>
+  fromArrayToObject(fromStringToArray(path), value)
+
+const fromObjectToArrayList = structure => {
+  const paths = []
+  const getPath = (object, path) => {
+    Object.entries(object).forEach(entry => {
+      const [key, value] = entry
+      if (isObject(value)) {
+        getPath(value, [...path, key])
       } else {
-        original.push([...acc])
+        paths.push([...path, key])
       }
+    })
+  }
+  getPath(structure, [])
+  return paths
+}
+
+const fromObjectToStringList = structure =>
+  fromObjectToArrayList(structure).map(fromArrayToString)
+
+const parseToObject = (dataStructure, value) =>
+  typeof dataStructure === 'string'
+    ? fromStringToObject(dataStructure, value)
+    : dataStructure
+
+/*
+  Inner functions
+*/
+
+const reach = queryObject => path =>
+  isArray(path)
+    ? reachArray(queryObject, path)
+    : reachString(queryObject, path)
+
+const reachArray = (queryObject, path) => {
+  if (path.length === 1) {
+    return ({
+      parentObject: queryObject,
+      propertyName: path[0],
+      propertyValue: queryObject[path[0]]
+    })
+  }
+  const clonedArray = [...path]
+  const nextProp = clonedArray.shift()
+  const nextObject = queryObject[nextProp]
+  return reach(nextObject)(clonedArray)
+}
+
+const reachString = (queryObject, path) =>
+  reachArray(queryObject, fromStringToArray(path))
+
+const addPartialPaths = paths =>
+  isArray(paths[0])
+    ? addPartialArrayPaths(paths)
+    : addPartialStringPaths(paths)
+
+const addPartialArrayPaths = paths => {
+  const listOfPaths = []
+  const addPath = path => {
+    listOfPaths.push(path)
+    if (path.length > 1) {
+      const clonedPath = [...path]
+      clonedPath.pop()
+      addPath(clonedPath)
     }
+  }
+  paths.forEach(addPath)
+  return listOfPaths
+}
 
-    treeToListLoop(obj)
-    return original
-  },
+const addPartialStringPaths = paths =>
+  pipe(
+    fromStringListToArrayList,
+    addPartialArrayPaths,
+    fromArrayListToStringList
+  )(paths)
 
-  /*
-  Opposite to treeToList(), this function will assemble a list of prop names into an object.
-    Example:
-    Passing an object [[a,b], [a,c]]
-    would return {a: {b: 1, c: 2}}
-  */
-
-  listToTree (list) {
-    const tree = {}
-
-    const listToTreeLoop = (path, curr, original) => {
-      path = [...path]
-      const newKey = path.shift()
-      if (path.length > 1) {
-        if (!curr[newKey]) {
-          curr[newKey] = {}
-        }
-        return listToTreeLoop(path, curr[newKey], original)
-      } else {
-        curr[newKey] = path.shift()
-        return original
-      }
+const mergeObjects = (objA, objB) => {
+  const result = { ...objA }
+  Object.entries(objB).forEach(entry => {
+    const [key, valueB] = entry
+    const valueA = result[key]
+    if (isObject(valueA) && isObject(valueB)) {
+      result[key] = mergeObjects(valueA, valueB)
+    } else {
+      result[key] = valueB
     }
-    list.forEach(path => {
-      listToTreeLoop(path, tree, tree)
+  })
+  return result
+}
+
+const executeCallbacks = (request, sub = raven.funcs.subscriptions, store = raven.store) => {
+  const paths = pipe(
+    fromObjectToStringList,
+    addPartialPaths)(request)
+  const reachStore = reach(store)
+  paths
+    .filter(path => sub[path])
+    .flatMap(path =>
+      sub[path]
+        .map(callback =>
+          ({ path, callback })
+        )
+    )
+    .forEach(item =>
+      item.callback(reachStore(item.path).propertyValue)
+    )
+}
+
+const setValueToObject = targetObject => value => {
+  const pathList = fromObjectToArrayList(targetObject)
+    .map(path => [...path, value])
+  return fromArrayListToObject(pathList)
+}
+
+const copyValueToStore = (from, to, callback) => {
+  const stateAdd = setValueToObject(to)(callback(from.target[from.prop]))
+  set(stateAdd)
+}
+
+const pushFromElement = (from, to, callback = identity) => {
+  const events = typeof from.event === 'string'
+    ? [from.event]
+    : from.event || ['change', 'input']
+  events.forEach(event =>
+    from.target.addEventListener(event, e => {
+      const callbackArg = e.target.value || e.target.innerHTML
+      const callbackResult = callback(callbackArg)
+      set(setValueToObject(to)(callbackResult))
     })
+  )
+}
 
-    return tree
-  },
+const pushFromObject = (from, to, callback = identity) => {
+  from.target[`${prefix}${from.prop}`] = from.target[from.prop]
+  copyValueToStore(from, to, callback)
+  Object.defineProperty(
+    from.target,
+    from.prop,
+    {
+      set: value => {
+        const result = callback(value)
+        fromObjectToStringList(to)
+          .forEach(path =>
+            raven.set(path, result)
+          )
+        from.target[`${prefix}${from.prop}`] = value
+      },
+      get: () => from.target[`${prefix}${from.prop}`]
+    }
+  )
+}
 
-  /*
-    Takes an object that represents the branches of the tree and add the to each branches.
-      Example:
-      Assume a state of {b: {c: 2, d: 3}},
-      passing addValueToTree({b: 'c'}, 4)
-      will change the state to {a: 1, b: {c: 4, d: 3}}.
-  */
-  addValueToTree (obj, value) {
-    const listFromTree = this.treeToList(obj)
-    const mappedList = listFromTree.map(path => [...path, value])
-    const tree = this.listToTree([...mappedList])
-    return tree
-  },
+const pullToElement = (from, to, callback = identity) => {
+  const currentValue = reach(raven.store)(from).propertyValue
+  to.target[to.prop] = callback(currentValue)
+  subscribe(from, value => { to.target[to.prop] = callback(value) })
+}
 
-  /*
-  Subscribe allows a callback to be called whenever the prop changes on the given store.
-  */
-  subscribe (tree, callback, thisStore = this.store) {
-    const observedProps = this.treeToList(tree)
-    observedProps.forEach(list => {
-      const key = list.join('|')
-      // const key = JSON.stringify(list)
-      if (!this.sub[key]) {
-        this.sub[key] = []
-      }
-      this.sub[key].push(callback)
-    })
-  },
+/*
+  API
+*/
 
-  /*
-  Gets [x,y,z] and returns [[x],[x,y],[x,y,z]]. Useful for traversing trees.
-  */
-  expandList (array) {
-    const expandedArray = []
-    array.forEach((item, idx) => {
-      if (idx === 0) { expandedArray.push([item]) } else {
-        const newItem = [...expandedArray[idx - 1]]
-        newItem.push(item)
-        expandedArray.push(newItem)
-      }
-    })
-    return expandedArray
-  },
+const load = userStore => {
+  raven.store = userStore
+}
 
-  /*
-  The primary way of changing values in the state. When state is changed via "set", the callbacks get properly activated.
-  */
-  set (arg, store = this.store) {
-    const listOfPaths = []
-    const setLoop = (obj, ref, path = []) =>
-      Object.keys(obj).forEach(key => {
-        // Check if it exists on store, otherwise create it
-        // if (!ref[key]) ref[key] = undefined
+const set = (request, value) => {
+  const newValue = typeof request === 'string'
+    ? fromStringToObject(request, value)
+    : request
+  load(mergeObjects(raven.store, newValue))
+  executeCallbacks(newValue)
+}
 
-        // If it references an object, loop through its keys
-        if (this.isObject(obj[key])) {
-          path.push(key)
-          setLoop(obj[key], obj, path)
-          return
-        }
-        // If it is an array, substitute it
-        if (this.isArray(obj[key])) {
-          if (ref[key] !== [...obj[key]]) {
-            listOfPaths.push([...path, key])
-            ref[key] = [...obj[key]]
-          }
-          return
-        }
-        // If it is scalar, substitute it
-        if (ref[key] !== obj[key]) {
-          listOfPaths.push([...path, key])
-          ref[key] = obj[key]
+const subscribe = (target, callback) => {
+  const callbackKeys = isObject(target)
+    ? fromObjectToStringList(target)
+    : isArray(target)
+      ? [fromArrayToString(target)]
+      : [target]
+  callbackKeys.forEach(key => {
+    raven.funcs.subscriptions[key] = [
+      ...(raven.funcs.subscriptions[key] || []),
+      callback
+    ]
+  })
+}
+
+const clear = condition => {
+  if (!condition) {
+    raven.funcs.subscriptions = {}
+    return
+  }
+
+  const conditionArray = isArray(condition)
+    ? condition
+    : [condition]
+
+  conditionArray.forEach(item => {
+    if (isString(item)) {
+      delete raven.funcs.subscriptions[item]
+    } else {
+      Object.keys(raven.store).forEach(key => {
+        if (raven.funcs.subscriptions[key]) {
+          raven.funcs.subscriptions[key] = raven.funcs.subscriptions[key]
+            .filter(callback => callback !== item)
         }
       })
-    setLoop(arg, store)
-    this.doCallbacks(listOfPaths, store)
-  },
-
-  /*
-  Runs callbacks subscribed under the arguments.
-    Example:
-    If ['country', 'state', 'town'] is passed as argument, all callbacks registered
-    under "country", "country|state" and "country|state|town" get called.
-  */
-  doCallbacks (listOfArgs, store = this.store) {
-    const expandedListRepeated = listOfArgs.map(list => this.expandList(list))
-    const expandedList = [...new Set(expandedListRepeated)]
-    expandedList.forEach(fullList => fullList.forEach(list => {
-      const key = list.join('|')
-      // const key = JSON.stringify(list)
-      if (this.sub[key]) {
-        const reached = this.reach(list)
-        this.sub[key].forEach(func => func && func(reached.target[reached.prop]))
-      }
-    }))
-  },
-
-  /*
-  Hooks up so that any change to a variable "from" is send through "callback"
-  and set to state field "to". It is mainly meant from collecting input from user
-  and automatically setting it to state.
-  */
-  push (from, to, callback = x => x) {
-    if (from.target instanceof window.HTMLElement) {
-      let events = from.event || ['change', 'input']
-      if (typeof from.event === 'string') { events = [from.event] }
-      events.forEach(event =>
-        from.target.addEventListener(event, e => {
-          const callbackArg = e.target.value || e.target.innerHTML
-          const callbackResult = callback(callbackArg)
-          this.set(this.addValueToTree(to, callbackResult))
-        })
-      )
-    } else {
-      Object.defineProperty(
-        from.target,
-        from.prop,
-        {
-          set: value => {
-            const listOfPaths = this.treeToList(to).map(list => [...list, callback(value)])
-            const newTree = this.listToTree(listOfPaths)
-            raven.set(newTree)
-
-            from.target[`${this.prefix}${from.prop}`] = value
-          },
-          get: () => from.target[`${this.prefix}${from.prop}`]
-        }
-      )
     }
-  },
+  })
+}
 
-  /*
-  Hooks up so that any change to state field "from" goes through "callback"
-  and is reflected to variable "to". It is mainly meant for data binding.
-  */
-  pull (from, to, callback = x => x) {
-    this.subscribe(from, value => { to.target[to.prop] = callback(value) })
-  },
+// Push changes from an object/DOM element to a target object
+const push = (from, to, callback = identity, funcEl = pushFromElement, funcObj = pushFromObject) => {
+  const parsedTo = parseToObject(to, true)
+  const func = from.target instanceof window.HTMLElement
+    ? funcEl
+    : funcObj
+  func(from, parsedTo, callback)
+}
 
-  /*
-  A combination of push and pull. It allows change in a variable
-  (let's say, an input) to be pushed up to store, and any changes to store
-  to be passed down.
-  */
-  sync (stateTree, obj, callbackToTree, callbackToObject) {
-    this.pull(stateTree, obj, callbackToObject)
-    this.push(obj, stateTree, callbackToTree)
+// Pull changes from an object to a target object/Dom element
+const pull = (from, to, callback = identity, funcEl = pullToElement) => {
+  let parsedFrom = from
+  if (isObject(from)) {
+    const allPaths = fromObjectToArrayList(from)
+    if (allPaths.length > 1) {
+      throw new Error('Raven.pull cannot be passed an object with multiple properties.')
+    } else {
+      parsedFrom = allPaths[0]
+    }
+  }
+  funcEl(parsedFrom, to, callback)
+}
+
+// Push and pull shortcut that assumes a link between a DOM element and the store
+const sync = (path, element, callbackToPath = identity, callbackToElement = identity) => {
+  pull(path, element, callbackToElement)
+  push(element, path, callbackToPath)
+}
+
+const raven = {
+  clear,
+  load,
+  pull,
+  push,
+  set,
+  store: {},
+  subscribe,
+  sync,
+  funcs: {
+    addPartialPaths,
+    addPartialArrayPaths,
+    addPartialStringPaths,
+    copyValueToStore,
+    fromArrayListToObject,
+    fromArrayToString,
+    fromStringToObject,
+    fromObjectToStringList,
+    fromObjectToArrayList,
+    fromStringToArray,
+    executeCallbacks,
+    isArray,
+    isObject,
+    isString,
+    mergeObjects,
+    pullToElement,
+    pushFromObject,
+    pushFromElement,
+    reach,
+    reachArray,
+    reachString,
+    setValueToObject,
+    subscriptions: {}
   }
 }
 

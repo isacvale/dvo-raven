@@ -1,4 +1,4 @@
-import raven from './raven.js'
+import raven from '../src/index.js'
 
 const evChange = (el, value) => {
   el.value = value

@@ -1,123 +1,171 @@
 # Raven
 
-## Overview
-### What it does
-Raven is a way to keep state and do data binding. It was made for sites/apps developed in vanilla, without frameworks.
+**Raven** is a tool to manage state and do data-binding in JS vanilla applications.
 
-### How to use it
-After calling raven.**load**() and passing it your app's state as a single object, you can call the following methods:
-1. **subscribe**(*obj*, *callback*) runs the given callback when the variables indicated by obj change.
-1. **set**(*obj*) is how you change the state of yout app. Changing it directly won't fire callbacks.
-1. **push**(*from*, *to*, *func*) makes it so every change to variable "from" is reflected up to state field "to", after passing through function "func".
-1. **pull**(*from*,*to*, *func*) makes it so every change to state field "from" is reflected down to variable "to", after passing through function "func".
-1. **sync**(*state*,*var*,*statefunc*,*varfunc*) makes it so any changes to store or variable are reflected on each other, having passed through a given function.
+It allows you to keep the state of your application in a single place (aka. the store) and allows you to attach callbacks that execute when changes happen to any particular piece of data.
 
----
+It also allows you to link DOM elements to any piece os data in the store, so the changes to the store are reflected on the DOM and vice-versa.
 
-## How to reference state variables
-In Raven, you reference your state variables by passing an object that mirrors the "path" to that variable. For example, suppose you want to give a value to the variable "answer" in the state below:
+Because the store doesn't rely on getters and setters, it is easy to inspect and easily detect changes to deeply nested properties, including arrays and objects.
 
-    state = {
-      universe: {
-        answer: null,
-        question: null
-      }
+## How to pass references
+Because in javascript arguments are "passed by value", references to an object or DOM elements property are made through an object with a _target_ and a _prop_ properties. We'll call it `reference by object`.
+
+For example, consider the following object:
+```javascript
+const store = {
+  keyA: {
+    keyB: {
+      keyC: 'value'
     }
+  }
+}
+```
+To make a reference to value, you'd do:
+```javascript
+const reference = {
+  target: store.keyA.keyB,
+  prop: keyC
+}
+```
+There is a second, easier way to pass the reference: as a string of period separated props. We'll call it `reference by string`. The same reference as above could be writen as:
+```javascript
+const reference = 'keyA.keyB.keyC'
+```
+## How to use Raven
 
-You'd do:
+### ⚬ Import
+**Raven** is an ES6 module.
+```javascript
+import raven from './node_modules/@dvo/raven/lib/index.js'
+```
 
-    raven.set({universe: {answer: 42}})
+### ⚬ Create a store and load it to raven
+```javascript
+const store = {
+  a: []
+  b: {
+    c: 0, d: 0
+  }
+}
+raven.load(store)
+```
+### ⚬ Setting values
+Once a store is loaded, you nee to call `raven.set` to change values (directly changing them would not fire any callback).
+In the example below, we'd set the "c" property of the store above to 10 using `reference by string`:
+```javascript
+raven.set('b.c', 10)
+```
+Alternatively, if you pass a `reference by object`, you can change multiple properties to different values in one go:
+```javascript
+raven.set({
+  a: [1, 2, 3]
+  b: { c: 10 }
+})
+```
 
-So far, so simple. But suppose you want to *reference* the variable, and *not provide* the value. In this case, the name of the variable is passed as a string, and no value is passed. For example, to subscribe a callback for changes to variable "answer", you'd do:
+### ⚬ Subscribing callbacks
+You can subscribe callbacks to run when any particular piece of data within the store is changed. The example below would output the new value of "c" whenever it changed - in this case, it'd log hello world".
+```javascript
+raven.callback('b.c', console.log)
+raven.set('b.c', 'hello world')
+// Logs 'hello world'
+```
+If you subscribe a callback to a prop, any changes to its value - no matter how deep - will trigger the callback. So in the example below, note how one change to the store can trigger multiple callbacks:
 
-    raven.subscribe({universe: "answer"}, callbackFunction)
+```javascript
+raven.callback('b', console.log)
+raven.callback('b.c', console.log)
+raven.set('b.c', 'hello world')
+// Logs 'hello world'
+// Logs { c: 'hello world' }
+```
+_(For future-proofing, you should not rely on the order of execution of the callbacks.)_
 
-The advantage using objets for referencing that you can point to multiple state properties at once. For example, if you wanted to subscribe to changes to both question and answer in the example above, you'd do:
+### ⚬ Clearing subscriptions
+You can clear all subscriptions by calling:
+```javascript
+raven.clear()
+```
+If you pass a `reference by string` or array such references, all callbacks attached to those properties are forgotten.
+```javascript
+raven.clear(['b', 'b.c'])
+```
+If you pass a function or array of functions, any instance of that function registerd as a callback will be forgotten, no matter to what property it is attached to.
+```javascript
+raven.clear(console.log)
+```
+You could pass arrays containing both `reference by string` and functions.
 
-    raven.subscribe({universe: ["answer", "question"]}, callbackFunction)
+### ⚬ Pushing values
+To "push" means sending the value of an input up to the store, dynamically. Doing so requires you pass DOM element `referenced by object`, and then the property of the store, usually `referenced by string`. In the example below, we'll push any value typed on the input to the prop 'd' of the store.
+```javascript
+raven.push({
+  target: document.querySelector('input[type="text"]')
+  prop: 'value'
+},
+  'b.d'
+)
+```
+`Raven.push` takes an optional third parameter: a function that will receive and process the value of the input before setting it to the store. For example:
+```javascript
+raven.push({
+  target: document.querySelector('input[type="text"]')
+  prop: 'value
+},
+  'b.d',
+  Number
+)
+// Whatever the user types into the input gets coerced into a number.
+```
+_(Push has a fourth and fith optional arguments for dependency injection for testing purposes. Normal use dispenses them.)_
 
-And there's still a third way to do references. If the variable you're after is not in the state, you must pass a reference to its parent object and it's property name. For example, to push up the value from input, you could do:
+### ⚬ Pulling values
+To "pull" means sending the value from the store back to a DOM element. Doing so requires referencing the property of the store (usually a `reference by string`) and then the DOM element, `referenced by object`. In the example below we'll pull the prop "d" of the store into the `<h1>` of the page.
+```javascript
+raven.pull(
+  'b.d',
+  {
+    target: document.querySelector('h1')
+    prop: 'textContent'
+  }
+)
+```
+`Raven.pull` takes an optional third parameter: a function that will receive and process the value of the store before pulling it into the DOM element. For example:
+```javascript
+raven.pull({
+  target: document.querySelector('input[type="text"]')
+  prop: 'value
+},
+  'b.d',
+  value => `USD $${value},00`
+)
+// Any value in the prop "d" will be masked into a currency notation before put in the <h1>.
+```
+_(Pull has a fourth optional argument for dependency injection for testing purposes. Normal use dispenses it.)_
 
-    raven.push({
-        target: document.querySelector("#arthurs-brain"),
-        prop: "value"
-      },
-      { universe: "question" }
-    )
+### ⚬ Syncing an element to a store property
+Push and pull are often used together to create "controlled forms", which means: the input displays the value from the store, and any change to the input is reflected to the store. This very common use has its own shortcut in `Raven.sync`.
 
-Once you take in these referencing rules, using raven will be easy-peasy.
-
----
-## A deeper view
-### Preparing your store
-Create a single object containing all your state. You may write it in different objects, but must assemble them in order to be loaded into raven.
-
-To do so, use the command raven.load(), as in the example below.
-
-    const myState = {
-      location: {
-        country: 'Italy',
-        city: 'Rome'
-      },
-      personal: {
-        name: 'Vivian',
-        favoriteColor: 'yellow',
-        dislikes: [
-          "loud noise",
-          "veggies"
-        ]
-      }
-
-    raven.load(myState)
-
-### Writing the callbacks
-The callbacks contain much of the logic of the application. They tend to be very short functions that manipulate the DOM. For example,
-
-    const warnOfColorChange = () => document.querySelector('#warn-output')
-    .textContent = "The color has changed!"
-
-### Registering callbacks
-When a callback is registered to a property of your state, that callback will fire whenever a change is observed on the target property.
-
-To register a callback, use raven.register() passing an object to represent which properties to watch and the callback function. In the example below, the callback will run whenever the favoriteColor is modified.
-
-    const callback = (value, old) => 
-      console.log(`The favorite color change from ${old} to ${value}.`)
-
-    raven.register({
-      personal: 'favoriteColor'
-      },
-      callback
-    )
-    
-There are some important things to be aware of:
-1. the object argument has the name of the argument to listen **as a string**, so to watch "bar" in {foo: {bar: 42}}, you'd pass {foo: 'bar'}.
-1. Many variables to watch may be passed in a single call. The callback would run whenever any of those change.
-1. The callback will receive as argument the new value.
-
-#### Changing state on complex data
-You may associate callbacks to entire objects instead of its particular properties. This means a callback will fire if any of its properties are changed.
-Extending the example above, we could rig callback to fire when any dislikes changes by subscribing:
-
-    raven.register({personal: "dislikes"}, callback)
-
-#### Subscribing root properties
-Because you can't create a JS object with a key without value, subscribing a root property is a bit of a gotcha. There's two ways to do it:
-
-1. You can pass it as a string. For example raven.subscribe("personal", callback) would run whenever any personal prop changed.
-1. If you need to pass an object, you can just assign it any value other than an object, array or a string - we recommend 0. So raven.subscribe({personal: 0}, callback) would work just fine.
-
-
-## Changing state
-To change state, use the method raven.set() passing as parameter an object representing the branches that were modified.
-For example, consider the call
-
-    raven.set({
-      location: {
-        country: 'Scotland',
-        city: 'Edinburgh'
-      }
-    })
-
-This will change the state in two positions, country and city, and all callbacks associated with both field will be executed. In fact, any callbacks rigged to 'location' would also fire (once).
-
+It takes the property of the store (usually a `reference by string`) and the element (`reference by object`), setting both pull and push for you. For example:
+```javascript
+raven.sync(
+  'b.d',
+  {
+    target: document.querySelector('input[type="text"]')
+    prop: 'value
+  }
+)
+```
+`Raven.sync` takes optional third and fourth parameters. The third is the intermediate function to format the value as it is pushed up to the store and the fourth is the intermediate function to format the value as it is pulled down to the input. For example:
+```javascript
+raven.sync(
+  'b.d',
+  {
+    target: document.querySelector('input[type="text"]')
+    prop: 'value
+  },
+  value => value.slice(4),
+  value => `USD $${value}`
+)
+```

@@ -1,4 +1,4 @@
-import raven from './raven.js'
+import raven from '../src/index.js'
 
 const evChange = (el, value) => {
   el.value = value
@@ -330,5 +330,55 @@ describe('Testing functionalities.', () => {
     expect(element.value).toBe('afterChange')
     evChange(element, 'afterSecondChange')
     expect(raven.store.value).toBe('afterSecondChange')
+  })
+
+  test("Can clear all registered callbaks.", () => {
+    const func = () => {}
+    raven.clear()
+    raven.load({ a: 0, b: 0 })
+    raven.subscribe('a', func)
+    raven.subscribe('b', func)
+    raven.clear()
+    expect(raven.funcs.subscriptions).toEqual({})
+  })
+
+  test("Can clear registered callbaks from a specific path.", () => {
+    const func = () => {}
+    raven.clear()
+    raven.load({ a: 0, b: 0 })
+    raven.subscribe('a', func)
+    raven.subscribe('b', func)
+    raven.clear('b')
+    expect(Object.keys(raven.funcs.subscriptions)).toEqual(['a'])
+  })
+
+  test("Can clear registered callbaks by function.", () => {
+    const funcA = () => {}
+    const funcB = () => {}
+    raven.clear()
+    raven.load({ a: 0 })
+    raven.subscribe('a', funcA)
+    raven.subscribe('a', funcB)
+    raven.clear(funcA)
+    expect(raven.funcs.subscriptions.a).toEqual([funcB])
+  })
+
+  test("Can clear callbacks with an array of conditions.", () => {
+    const funcA = () => {}
+    const funcB = () => {}
+    const funcC = () => {}
+    raven.clear()
+    raven.load({ a: 0, b: 0, c: 0 })
+    raven.subscribe('a', funcA)
+    raven.subscribe('a', funcB)
+    raven.subscribe('b', funcB)
+    raven.subscribe('b', funcC)
+    raven.subscribe('c', funcA)
+    raven.subscribe('c', funcC)
+    raven.clear(['a', funcB])
+    expect(raven.funcs.subscriptions).toEqual({
+      b: [funcC],
+      c: [funcA, funcC]
+    })
   })
 })
